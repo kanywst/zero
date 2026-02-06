@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ZeroEditor",
+  "productName": "Zero",
   "version": "0.1.0",
   "identifier": "com.kanywst.zero",
   "build": {
