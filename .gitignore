@@ -8,6 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+ZeroEditor/node_modules
 dist
 dist-ssr
 *.local
@@ -22,3 +23,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Rust/Tauri
+ZeroEditor/src-tauri/target/
+ZeroEditor/src-tauri/gen/schemas
+target/
+
+# Homebrew Tap (Sub-project)
+homebrew-tap/
