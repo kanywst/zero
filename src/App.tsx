@@ -130,17 +130,27 @@ export default function App() {
     }
   }, [loadFiles])
 
-  const saveKeymap = useRef(
-    keymap.of([
-      {
-        key: 'Mod-s',
-        run: () => {
-          saveFile()
-          return true
+  const [extensions, setExtensions] = useState<any[]>([])
+  const saveFileRef = useRef(saveFile)
+
+  useEffect(() => {
+    saveFileRef.current = saveFile
+  }, [saveFile])
+
+  useEffect(() => {
+    setExtensions([
+      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      keymap.of([
+        {
+          key: 'Mod-s',
+          run: () => {
+            saveFileRef.current()
+            return true
+          },
         },
-      },
-    ]),
-  )
+      ]),
+    ])
+  }, []) // Initialize once
 
   const createNewFile = useCallback(() => {
     setCurrentFile(null)
@@ -320,10 +330,7 @@ export default function App() {
                 value={content}
                 height="100%"
                 theme={oneDark}
-                extensions={[
-                  markdown({ base: markdownLanguage, codeLanguages: languages }),
-                  saveKeymap.current,
-                ]}
+                extensions={extensions}
                 onChange={(value) => {
                   setContent(value)
                   setIsSaved(false)

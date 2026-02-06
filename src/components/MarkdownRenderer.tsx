@@ -9,7 +9,14 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const MarkdownLink = ({ href, children, ...props }: any) => (
+export const MarkdownLink = ({
+  href,
+  children,
+  ...props
+}: {
+  href?: string
+  children?: React.ReactNode
+}) => (
   <a
     {...props}
     href={href}
@@ -22,7 +29,16 @@ export const MarkdownLink = ({ href, children, ...props }: any) => (
   </a>
 )
 
-export const MarkdownCode = ({ inline, className, children, ...props }: any) => {
+export const MarkdownCode = ({
+  inline,
+  className,
+  children,
+  ...props
+}: {
+  inline?: boolean
+  className?: string
+  children?: React.ReactNode
+}) => {
   const match = /language-(\w+)/.exec(className || '')
   const [diagram, setDiagram] = useState('')
 

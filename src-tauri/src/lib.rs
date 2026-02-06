@@ -38,7 +38,7 @@ fn list_markdown_files(app: tauri::AppHandle, state: State<'_, AppState>) -> Vec
     if base_dir.as_os_str().is_empty() {
         *base_dir = get_default_dir(&app);
     }
-    
+
     let mut files = Vec::new();
     if let Ok(entries) = fs::read_dir(&*base_dir) {
         for entry in entries.flatten() {
@@ -55,7 +55,11 @@ fn list_markdown_files(app: tauri::AppHandle, state: State<'_, AppState>) -> Vec
 }
 
 #[tauri::command]
-fn read_markdown_file(app: tauri::AppHandle, state: State<'_, AppState>, file_name: String) -> Result<String, String> {
+fn read_markdown_file(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    file_name: String,
+) -> Result<String, String> {
     let mut base_dir = state.base_dir.lock().unwrap();
     if base_dir.as_os_str().is_empty() {
         *base_dir = get_default_dir(&app);
@@ -65,7 +69,12 @@ fn read_markdown_file(app: tauri::AppHandle, state: State<'_, AppState>, file_na
 }
 
 #[tauri::command]
-fn write_markdown_file(app: tauri::AppHandle, state: State<'_, AppState>, file_name: String, content: String) -> Result<(), String> {
+fn write_markdown_file(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    file_name: String,
+    content: String,
+) -> Result<(), String> {
     let mut base_dir = state.base_dir.lock().unwrap();
     if base_dir.as_os_str().is_empty() {
         *base_dir = get_default_dir(&app);
@@ -76,7 +85,9 @@ fn write_markdown_file(app: tauri::AppHandle, state: State<'_, AppState>, file_n
 
 #[tauri::command]
 fn open_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
-    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
