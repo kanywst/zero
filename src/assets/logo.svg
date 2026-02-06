@@ -1,0 +1,34 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景の角丸ボックス -->
+  <rect width="512" height="512" rx="110" fill="#050505"/>
+  
+  <!-- 背面の微かなグロー -->
+  <circle cx="256" cy="256" r="180" fill="url(#paint0_radial)" opacity="0.4"/>
+
+  <!-- メインの "0" (Zero) リング -->
+  <circle cx="256" cy="256" r="140" stroke="url(#paint1_linear)" stroke-width="32" stroke-linecap="round"/>
+  
+  <!-- "Z" を構成する鋭いスラッシュ -->
+  <path d="M190 190L322 322" stroke="url(#paint2_linear)" stroke-width="32" stroke-linecap="round"/>
+  <path d="M190 190H322" stroke="url(#paint1_linear)" stroke-width="32" stroke-linecap="round" opacity="0.8"/>
+  <path d="M190 322H322" stroke="url(#paint1_linear)" stroke-width="32" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- 装飾的な光点 -->
+  <circle cx="322" cy="190" r="8" fill="#A855F7"/>
+  <circle cx="190" cy="322" r="8" fill="#6366F1"/>
+
+  <defs>
+    <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(256 256) rotate(90) scale(180)">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#050505" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paint1_linear" x1="116" y1="116" x2="396" y2="396" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <linearGradient id="paint2_linear" x1="190" y1="190" x2="322" y2="322" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A855F7"/>
+      <stop offset="1" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+</svg>

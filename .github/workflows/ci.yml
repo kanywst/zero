@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: ZeroEditor/package-lock.json
+      - name: Install dependencies
+        run: cd ZeroEditor && npm ci
+      - name: Lint
+        run: cd ZeroEditor && npx eslint .
+      - name: Format Check
+        run: cd ZeroEditor && npx prettier --check .
+      - name: Type Check
+        run: cd ZeroEditor && npx tsc
+      - name: Security Audit
+        run: cd ZeroEditor && npm audit --audit-level=high
+
+  backend:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Rust Format
+        run: cd ZeroEditor/src-tauri && cargo fmt --all -- --check
+      - name: Clippy
+        run: cd ZeroEditor/src-tauri && cargo clippy -- -D warnings
