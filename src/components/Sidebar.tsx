@@ -1,13 +1,8 @@
 import { motion } from 'framer-motion'
 import { FileText, Plus, FolderOpen, Settings } from 'lucide-react'
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
 import { useFile } from '../contexts/FileContext'
 import { useEditor } from '../contexts/EditorContext'
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
+import { cn } from '../lib/utils'
 
 export function Sidebar() {
   const { files, baseDir, changeBaseDir } = useFile()

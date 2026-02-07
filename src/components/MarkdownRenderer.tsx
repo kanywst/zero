@@ -1,12 +1,7 @@
 import { memo } from 'react'
-import { twMerge } from 'tailwind-merge'
-import { clsx, type ClassValue } from 'clsx'
 import mermaid from 'mermaid'
 import { useMarkdownPreview } from '../hooks/useMarkdownPreview'
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
+import { cn } from '../lib/utils'
 
 mermaid.initialize({
   startOnLoad: false,
