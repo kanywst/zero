@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import morphdom from 'morphdom'
 import mermaid from 'mermaid'
+import { parseMarkdown, openUrl } from '../api/commands'
 
 export function useMarkdownPreview(content: string) {
   const [html, setHtml] = useState('')
@@ -13,7 +13,7 @@ export function useMarkdownPreview(content: string) {
     let active = true
     const timeoutId = setTimeout(async () => {
       try {
-        const result: string = await invoke('parse_markdown', { content })
+        const result = await parseMarkdown(content)
         if (active) setHtml(result)
       } catch (err) {
         console.error('Failed to parse markdown:', err)
@@ -56,7 +56,7 @@ export function useMarkdownPreview(content: string) {
       if (link) {
         e.preventDefault()
         const href = link.getAttribute('href')
-        if (href) invoke('open_url', { url: href })
+        if (href) openUrl(href)
       }
     }
 

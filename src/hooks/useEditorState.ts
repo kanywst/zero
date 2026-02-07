@@ -1,5 +1,5 @@
 import { useCallback, useRef, useReducer, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/core'
+import { readMarkdownFile, writeMarkdownFile } from '../api/commands'
 
 export interface NotificationState {
   message: string
@@ -105,7 +105,7 @@ export function useEditorState(onFileSaved?: () => void) {
   const loadFileContent = useCallback(async (fileName: string) => {
     dispatch({ type: 'START_LOAD' })
     try {
-      const result: string = await invoke('read_markdown_file', { fileName })
+      const result = await readMarkdownFile(fileName)
       dispatch({ type: 'LOAD_SUCCESS', fileName, content: result })
     } catch {
       dispatch({ type: 'SET_ERROR', message: 'Failed to read file' })
@@ -123,10 +123,7 @@ export function useEditorState(onFileSaved?: () => void) {
 
     dispatch({ type: 'START_SAVE' })
     try {
-      await invoke('write_markdown_file', {
-        fileName: fileToSave,
-        content: contentToSave,
-      })
+      await writeMarkdownFile(fileToSave, contentToSave)
       dispatch({ type: 'SAVE_SUCCESS', message: 'Saved' })
       setTimeout(() => dispatch({ type: 'CLEAR_NOTIFICATION' }), 2000)
       onFileSaved?.()
@@ -142,10 +139,7 @@ export function useEditorState(onFileSaved?: () => void) {
 
     dispatch({ type: 'START_SAVE' })
     try {
-      await invoke('write_markdown_file', {
-        fileName,
-        content: contentToSave,
-      })
+      await writeMarkdownFile(fileName, contentToSave)
       dispatch({ type: 'LOAD_SUCCESS', fileName, content: contentToSave })
       dispatch({ type: 'SAVE_SUCCESS', message: 'Created & Saved' })
       setTimeout(() => dispatch({ type: 'CLEAR_NOTIFICATION' }), 2000)

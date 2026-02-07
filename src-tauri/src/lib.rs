@@ -1,7 +1,7 @@
 use pulldown_cmark::{html, Options, Parser};
 use std::fs;
-use std::path::PathBuf;
-use std::sync::Mutex;
+use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_cli::CliExt;
 use tauri_plugin_opener::OpenerExt;
@@ -11,6 +11,8 @@ use tauri_plugin_store::StoreExt;
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("Path traversal detected or invalid path: {0}")]
+    InvalidPath(String),
     #[error("{0}")]
     Generic(String),
 }
@@ -27,7 +29,7 @@ impl serde::Serialize for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct AppState {
-    pub base_dir: Mutex<PathBuf>,
+    pub base_dir: RwLock<PathBuf>,
 }
 
 pub fn parse_markdown_internal(content: String) -> String {
@@ -61,35 +63,61 @@ pub fn get_default_dir(app: &tauri::AppHandle) -> PathBuf {
     app.path().home_dir().unwrap_or_else(|_| PathBuf::from("/"))
 }
 
+/// Helper to ensure the file path is within the base directory.
+/// This prevents directory traversal attacks (e.g., "../../etc/passwd").
+fn ensure_safe_path(base: &Path, file_name: &str) -> Result<PathBuf> {
+    if file_name.contains("..") || file_name.starts_with('/') || file_name.contains('\\') {
+        return Err(Error::InvalidPath(file_name.to_string()));
+    }
+    Ok(base.join(file_name))
+}
+
 pub fn get_resolved_base_dir(
     app: &tauri::AppHandle,
     state: &State<'_, AppState>,
 ) -> Result<PathBuf> {
-    let mut dir = state
-        .base_dir
-        .lock()
-        .map_err(|_| Error::Generic("Mutex poisoned".into()))?;
-    if dir.as_os_str().is_empty() {
-        let store_result = app
-            .get_store("settings.json")
-            .or_else(|| app.store("settings.json").ok());
-
-        if let Some(store) = store_result {
-            if let Some(saved_path) = store.get("base_dir") {
-                if let Some(path_str) = saved_path.as_str() {
-                    let path = PathBuf::from(path_str);
-                    if path.exists() {
-                        *dir = path;
-                    }
-                }
-            }
-        }
-
-        if dir.as_os_str().is_empty() {
-            *dir = get_default_dir(app);
+    // 1. Try to get from state (read lock)
+    {
+        let dir = state
+            .base_dir
+            .read()
+            .map_err(|_| Error::Generic("RwLock poisoned".into()))?;
+        if !dir.as_os_str().is_empty() {
+            return Ok(dir.clone());
         }
     }
-    Ok(dir.clone())
+
+    // 2. If empty, try to load from store
+    let store_path = app
+        .get_store("settings.json")
+        .or_else(|| app.store("settings.json").ok())
+        .and_then(|store| {
+            store
+                .get("base_dir")
+                .and_then(|v| v.as_str().map(PathBuf::from))
+        });
+
+    if let Some(path) = store_path {
+        if path.exists() {
+            // Update state with write lock
+            let mut dir = state
+                .base_dir
+                .write()
+                .map_err(|_| Error::Generic("RwLock poisoned".into()))?;
+            *dir = path.clone();
+            return Ok(path);
+        }
+    }
+
+    // 3. Fallback to default
+    let default_dir = get_default_dir(app);
+    let mut dir = state
+        .base_dir
+        .write()
+        .map_err(|_| Error::Generic("RwLock poisoned".into()))?;
+    *dir = default_dir.clone();
+
+    Ok(default_dir)
 }
 
 #[tauri::command]
@@ -107,11 +135,16 @@ fn set_base_dir(app: tauri::AppHandle, state: State<'_, AppState>, new_path: Str
         return Err(Error::Generic("Selected directory does not exist.".into()));
     }
 
-    *state
-        .base_dir
-        .lock()
-        .map_err(|_| Error::Generic("Mutex poisoned".into()))? = path;
+    // Update state
+    {
+        let mut dir = state
+            .base_dir
+            .write()
+            .map_err(|_| Error::Generic("RwLock poisoned".into()))?;
+        *dir = path.clone();
+    }
 
+    // Persist to store
     let store = app
         .get_store("settings.json")
         .or_else(|| app.store("settings.json").ok())
@@ -155,7 +188,7 @@ async fn read_markdown_file(
     file_name: String,
 ) -> Result<String> {
     let base_dir = get_resolved_base_dir(&app, &state)?;
-    let file_path = base_dir.join(&file_name);
+    let file_path = ensure_safe_path(&base_dir, &file_name)?;
     log::info!("Reading file: {:?}", file_path);
 
     let content = tokio::fs::read_to_string(&file_path).await.map_err(|e| {
@@ -173,7 +206,7 @@ async fn write_markdown_file(
     content: String,
 ) -> Result<()> {
     let base_dir = get_resolved_base_dir(&app, &state)?;
-    let file_path = base_dir.join(&file_name);
+    let file_path = ensure_safe_path(&base_dir, &file_name)?;
     log::info!("Writing file: {:?}", file_path);
 
     tokio::fs::write(&file_path, content).await.map_err(|e| {
@@ -195,7 +228,7 @@ fn open_url(app: tauri::AppHandle, url: String) -> Result<()> {
 pub fn run() {
     tauri::Builder::default()
         .manage(AppState {
-            base_dir: Mutex::new(PathBuf::new()),
+            base_dir: RwLock::new(PathBuf::new()),
         })
         .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(tauri_plugin_opener::init())

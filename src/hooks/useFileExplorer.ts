@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { open as selectFolder } from '@tauri-apps/plugin-dialog'
+import { getBaseDir, listMarkdownFiles, setBaseDir as apiSetBaseDir } from '../api/commands'
 
 export function useFileExplorer() {
   const [files, setFiles] = useState<string[]>([])
@@ -8,10 +8,9 @@ export function useFileExplorer() {
 
   const loadFiles = useCallback(async () => {
     try {
-      const dir: string = await invoke('get_base_dir')
+      const [dir, fileList] = await Promise.all([getBaseDir(), listMarkdownFiles()])
       setBaseDir(dir)
-      const result: string[] = await invoke('list_markdown_files')
-      setFiles(result)
+      setFiles(fileList)
     } catch (err) {
       console.error('Failed to load files:', err)
     }
@@ -24,8 +23,9 @@ export function useFileExplorer() {
         multiple: false,
         title: 'Select Notes Directory',
       })
+      
       if (selected && typeof selected === 'string') {
-        await invoke('set_base_dir', { newPath: selected })
+        await apiSetBaseDir(selected)
         await loadFiles()
       }
     } catch (err) {
