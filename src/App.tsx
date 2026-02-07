@@ -22,7 +22,7 @@ function EditorShell() {
   const {
     currentFile,
     content,
-    isSaved,
+    notification,
     isNamingOpen,
     setIsNamingOpen,
     newName,
@@ -145,15 +145,20 @@ function EditorShell() {
         </AnimatePresence>
 
         <AnimatePresence>
-          {isSaved && (
+          {notification && (
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.1 } }}
               transition={{ type: 'spring', damping: 15, stiffness: 300 }}
-              className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg shadow-blue-500/40 z-50 pointer-events-none"
+              className={cn(
+                'absolute bottom-20 left-1/2 -translate-x-1/2 text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg z-50 pointer-events-none',
+                notification.type === 'success'
+                  ? 'bg-blue-500 shadow-blue-500/40'
+                  : 'bg-red-500 shadow-red-500/40',
+              )}
             >
-              saved
+              {notification.message}
             </motion.div>
           )}
         </AnimatePresence>

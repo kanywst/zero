@@ -1,10 +1,15 @@
 import { useState, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
+export interface NotificationState {
+  message: string
+  type: 'success' | 'error'
+}
+
 export function useEditorState(onFileSaved?: () => void) {
   const [currentFile, setCurrentFile] = useState<string | null>(null)
   const [content, setContent] = useState('')
-  const [isSaved, setIsSaved] = useState(false)
+  const [notification, setNotification] = useState<NotificationState | null>(null)
   const [isNamingOpen, setIsNamingOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -12,28 +17,44 @@ export function useEditorState(onFileSaved?: () => void) {
   const currentFileRef = useRef(currentFile)
   const contentRef = useRef(content)
 
-  const handleContentChange = useCallback((value: string) => {
-    setContent(value)
-    contentRef.current = value
-    setIsSaved(false)
-  }, [])
+  const handleContentChange = useCallback(
+    (value: string) => {
+      setContent(value)
+      contentRef.current = value
+      if (notification?.type === 'success') {
+        setNotification(null)
+      }
+    },
+    [notification],
+  )
 
-  const loadFileContent = useCallback(async (fileName: string) => {
-    setIsLoading(true)
-    try {
-      const result: string = await invoke('read_markdown_file', { fileName })
-      setContent(result)
-      contentRef.current = result
-      setCurrentFile(fileName)
-      currentFileRef.current = fileName
-      setIsSaved(false)
-      setIsNamingOpen(false)
-    } catch (err) {
-      console.error('Failed to read file:', err)
-    } finally {
-      setIsLoading(false)
+  const showNotification = useCallback((message: string, type: 'success' | 'error') => {
+    setNotification({ message, type })
+    if (type === 'success') {
+      setTimeout(() => setNotification(null), 2000)
     }
   }, [])
+
+  const loadFileContent = useCallback(
+    async (fileName: string) => {
+      setIsLoading(true)
+      try {
+        const result: string = await invoke('read_markdown_file', { fileName })
+        setContent(result)
+        contentRef.current = result
+        setCurrentFile(fileName)
+        currentFileRef.current = fileName
+        setNotification(null)
+        setIsNamingOpen(false)
+      } catch (err) {
+        console.error('Failed to read file:', err)
+        showNotification('Failed to read file', 'error')
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [showNotification],
+  )
 
   const saveFile = useCallback(async () => {
     const fileToSave = currentFileRef.current
@@ -50,15 +71,15 @@ export function useEditorState(onFileSaved?: () => void) {
         fileName: fileToSave,
         content: contentToSave,
       })
-      setIsSaved(true)
-      setTimeout(() => setIsSaved(false), 2000)
+      showNotification('Saved', 'success')
       onFileSaved?.()
     } catch (err) {
       console.error('Failed to save file:', err)
+      showNotification('Failed to save', 'error')
     } finally {
       setIsLoading(false)
     }
-  }, [onFileSaved])
+  }, [onFileSaved, showNotification])
 
   const handleCreateWithName = useCallback(async () => {
     if (!newName) return
@@ -74,34 +95,34 @@ export function useEditorState(onFileSaved?: () => void) {
       setCurrentFile(fileName)
       currentFileRef.current = fileName
       setIsNamingOpen(false)
-      setIsSaved(true)
+      showNotification('Created & Saved', 'success')
       setNewName('')
-      setTimeout(() => setIsSaved(false), 2000)
       onFileSaved?.()
     } catch (err) {
       console.error('Failed to create file:', err)
+      showNotification('Failed to create file', 'error')
     } finally {
       setIsLoading(false)
     }
-  }, [newName, onFileSaved])
+  }, [newName, onFileSaved, showNotification])
 
   const createNewFile = useCallback(() => {
     setCurrentFile(null)
     currentFileRef.current = null
     setContent('# New Note\n')
     contentRef.current = '# New Note\n'
-    setIsSaved(false)
+    setNotification(null)
   }, [])
 
   return {
     currentFile,
     content,
-    isSaved,
+    notification, // Export notification instead of isSaved
     isNamingOpen,
     setIsNamingOpen,
     newName,
     setNewName,
-    isLoading, // Export isLoading
+    isLoading,
     handleContentChange,
     loadFileContent,
     saveFile,

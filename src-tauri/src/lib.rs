@@ -88,9 +88,9 @@ fn get_resolved_base_dir(app: &tauri::AppHandle, state: &State<'_, AppState>) ->
 
 #[tauri::command]
 fn get_base_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> String {
-    get_resolved_base_dir(&app, &state)
-        .to_string_lossy()
-        .to_string()
+    let dir = get_resolved_base_dir(&app, &state);
+    log::info!("Fetching base directory: {:?}", dir);
+    dir.to_string_lossy().to_string()
 }
 
 #[tauri::command]
@@ -101,6 +101,7 @@ fn set_base_dir(
 ) -> Result<()> {
     let path = PathBuf::from(&new_path);
     if !path.exists() {
+        log::warn!("Attempted to set non-existent directory: {}", new_path);
         return Err(Error::Generic("Selected directory does not exist.".into()));
     }
 
@@ -113,12 +114,15 @@ fn set_base_dir(
 
     store.set("base_dir", serde_json::json!(new_path));
     store.save().map_err(|e| Error::Generic(e.to_string()))?;
+    
+    log::info!("Base directory updated to: {}", new_path);
     Ok(())
 }
 
 #[tauri::command]
 fn list_markdown_files(app: tauri::AppHandle, state: State<'_, AppState>) -> Vec<String> {
     let base_dir = get_resolved_base_dir(&app, &state);
+    log::debug!("Listing files in: {:?}", base_dir);
 
     let mut files = Vec::new();
     if let Ok(entries) = fs::read_dir(base_dir) {
@@ -141,8 +145,13 @@ async fn read_markdown_file(
     file_name: String,
 ) -> Result<String> {
     let base_dir = get_resolved_base_dir(&app, &state);
-    let file_path = base_dir.join(file_name);
-    let content = tokio::fs::read_to_string(file_path).await?;
+    let file_path = base_dir.join(&file_name);
+    log::info!("Reading file: {:?}", file_path);
+    
+    let content = tokio::fs::read_to_string(&file_path).await.map_err(|e| {
+        log::error!("Failed to read file {:?}: {}", file_path, e);
+        Error::Io(e)
+    })?;
     Ok(content)
 }
 
@@ -154,8 +163,13 @@ async fn write_markdown_file(
     content: String,
 ) -> Result<()> {
     let base_dir = get_resolved_base_dir(&app, &state);
-    let file_path = base_dir.join(file_name);
-    tokio::fs::write(file_path, content).await?;
+    let file_path = base_dir.join(&file_name);
+    log::info!("Writing file: {:?}", file_path);
+
+    tokio::fs::write(&file_path, content).await.map_err(|e| {
+        log::error!("Failed to write file {:?}: {}", file_path, e);
+        Error::Io(e)
+    })?;
     Ok(())
 }
 
