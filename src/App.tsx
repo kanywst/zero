@@ -12,6 +12,7 @@ import { EditorCore } from './components/EditorCore'
 import { EditorProvider, useEditor } from './contexts/EditorContext'
 import { FileProvider, useFile } from './contexts/FileContext'
 import { useAppEvents } from './hooks/useAppEvents'
+import { useLocalStorage } from './hooks/useLocalStorage'
 import { ViewMode } from './types/editor'
 
 function cn(...inputs: ClassValue[]) {
@@ -24,6 +25,7 @@ function EditorShell() {
     content,
     notification,
     isNamingOpen,
+    isDirty,
     setIsNamingOpen,
     newName,
     setNewName,
@@ -33,7 +35,7 @@ function EditorShell() {
     createNewFile,
   } = useEditor()
 
-  const [viewMode, setViewMode] = useState<ViewMode>('edit')
+  const [viewMode, setViewMode] = useLocalStorage<ViewMode>('zero-view-mode', 'edit')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const deferredContent = useDeferredValue(content)
@@ -61,6 +63,7 @@ function EditorShell() {
         <EditorToolbar
           currentFile={currentFile}
           viewMode={viewMode}
+          isDirty={isDirty}
           setViewMode={setViewMode}
           toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           toggleSearch={() => setIsSearchOpen(true)}

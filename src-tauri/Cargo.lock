@@ -5663,6 +5663,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-store",
  "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]

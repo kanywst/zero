@@ -8,6 +8,7 @@ interface EditorContextType {
   notification: NotificationState | null
   isNamingOpen: boolean
   isLoading: boolean
+  isDirty: boolean
   setIsNamingOpen: (open: boolean) => void
   newName: string
   setNewName: (name: string) => void

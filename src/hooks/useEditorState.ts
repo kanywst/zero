@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useCallback, useRef, useReducer, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 
 export interface NotificationState {
@@ -6,127 +6,164 @@ export interface NotificationState {
   type: 'success' | 'error'
 }
 
-export function useEditorState(onFileSaved?: () => void) {
-  const [currentFile, setCurrentFile] = useState<string | null>(null)
-  const [content, setContent] = useState('')
-  const [notification, setNotification] = useState<NotificationState | null>(null)
-  const [isNamingOpen, setIsNamingOpen] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+interface EditorState {
+  currentFile: string | null
+  content: string
+  lastSavedContent: string
+  notification: NotificationState | null
+  isLoading: boolean
+  isNamingOpen: boolean
+  newName: string
+}
 
-  const currentFileRef = useRef(currentFile)
-  const contentRef = useRef(content)
+type EditorAction =
+  | { type: 'START_LOAD' }
+  | { type: 'LOAD_SUCCESS'; fileName: string; content: string }
+  | { type: 'START_SAVE' }
+  | { type: 'SAVE_SUCCESS'; message: string }
+  | { type: 'SET_CONTENT'; content: string }
+  | { type: 'SET_ERROR'; message: string }
+  | { type: 'SET_NAMING_OPEN'; open: boolean }
+  | { type: 'SET_NEW_NAME'; name: string }
+  | { type: 'CLEAR_NOTIFICATION' }
+  | { type: 'NEW_FILE' }
 
-  const handleContentChange = useCallback(
-    (value: string) => {
-      setContent(value)
-      contentRef.current = value
-      if (notification?.type === 'success') {
-        setNotification(null)
+function editorReducer(state: EditorState, action: EditorAction): EditorState {
+  switch (action.type) {
+    case 'START_LOAD':
+    case 'START_SAVE':
+      return { ...state, isLoading: true, notification: null }
+    case 'LOAD_SUCCESS':
+      return {
+        ...state,
+        isLoading: false,
+        currentFile: action.fileName,
+        content: action.content,
+        lastSavedContent: action.content,
+        isNamingOpen: false,
       }
-    },
-    [notification],
-  )
+    case 'SAVE_SUCCESS':
+      return {
+        ...state,
+        isLoading: false,
+        lastSavedContent: state.content,
+        notification: { message: action.message, type: 'success' },
+      }
+    case 'SET_CONTENT':
+      return { ...state, content: action.content }
+    case 'SET_ERROR':
+      return {
+        ...state,
+        isLoading: false,
+        notification: { message: action.message, type: 'error' },
+      }
+    case 'SET_NAMING_OPEN':
+      return { ...state, isNamingOpen: action.open }
+    case 'SET_NEW_NAME':
+      return { ...state, newName: action.name }
+    case 'CLEAR_NOTIFICATION':
+      return { ...state, notification: null }
+    case 'NEW_FILE':
+      return {
+        ...state,
+        currentFile: null,
+        content: '# New Note\n',
+        lastSavedContent: '# New Note\n',
+        notification: null,
+      }
+    default:
+      return state
+  }
+}
 
-  const showNotification = useCallback((message: string, type: 'success' | 'error') => {
-    setNotification({ message, type })
-    if (type === 'success') {
-      setTimeout(() => setNotification(null), 2000)
-    }
+const initialState: EditorState = {
+  currentFile: null,
+  content: '',
+  lastSavedContent: '',
+  notification: null,
+  isLoading: false,
+  isNamingOpen: false,
+  newName: '',
+}
+
+export function useEditorState(onFileSaved?: () => void) {
+  const [state, dispatch] = useReducer(editorReducer, initialState)
+
+  // Ref sync for event handlers
+  const currentFileRef = useRef(state.currentFile)
+  const contentRef = useRef(state.content)
+
+  useEffect(() => {
+    currentFileRef.current = state.currentFile
+    contentRef.current = state.content
+  }, [state.currentFile, state.content])
+
+  const handleContentChange = useCallback((value: string) => {
+    dispatch({ type: 'SET_CONTENT', content: value })
   }, [])
 
-  const loadFileContent = useCallback(
-    async (fileName: string) => {
-      setIsLoading(true)
-      try {
-        const result: string = await invoke('read_markdown_file', { fileName })
-        setContent(result)
-        contentRef.current = result
-        setCurrentFile(fileName)
-        currentFileRef.current = fileName
-        setNotification(null)
-        setIsNamingOpen(false)
-      } catch (err) {
-        console.error('Failed to read file:', err)
-        showNotification('Failed to read file', 'error')
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [showNotification],
-  )
+  const loadFileContent = useCallback(async (fileName: string) => {
+    dispatch({ type: 'START_LOAD' })
+    try {
+      const result: string = await invoke('read_markdown_file', { fileName })
+      dispatch({ type: 'LOAD_SUCCESS', fileName, content: result })
+    } catch {
+      dispatch({ type: 'SET_ERROR', message: 'Failed to read file' })
+    }
+  }, [])
 
   const saveFile = useCallback(async () => {
     const fileToSave = currentFileRef.current
     const contentToSave = contentRef.current
 
     if (!fileToSave) {
-      setIsNamingOpen(true)
+      dispatch({ type: 'SET_NAMING_OPEN', open: true })
       return
     }
 
-    setIsLoading(true)
+    dispatch({ type: 'START_SAVE' })
     try {
       await invoke('write_markdown_file', {
         fileName: fileToSave,
         content: contentToSave,
       })
-      showNotification('Saved', 'success')
+      dispatch({ type: 'SAVE_SUCCESS', message: 'Saved' })
+      setTimeout(() => dispatch({ type: 'CLEAR_NOTIFICATION' }), 2000)
       onFileSaved?.()
-    } catch (err) {
-      console.error('Failed to save file:', err)
-      showNotification('Failed to save', 'error')
-    } finally {
-      setIsLoading(false)
+    } catch {
+      dispatch({ type: 'SET_ERROR', message: 'Failed to save' })
     }
-  }, [onFileSaved, showNotification])
+  }, [onFileSaved])
 
   const handleCreateWithName = useCallback(async () => {
-    if (!newName) return
-    const fileName = newName.endsWith('.md') ? newName : `${newName}.md`
+    if (!state.newName) return
+    const fileName = state.newName.endsWith('.md') ? state.newName : `${state.newName}.md`
     const contentToSave = contentRef.current
 
-    setIsLoading(true)
+    dispatch({ type: 'START_SAVE' })
     try {
       await invoke('write_markdown_file', {
         fileName,
         content: contentToSave,
       })
-      setCurrentFile(fileName)
-      currentFileRef.current = fileName
-      setIsNamingOpen(false)
-      showNotification('Created & Saved', 'success')
-      setNewName('')
+      dispatch({ type: 'LOAD_SUCCESS', fileName, content: contentToSave })
+      dispatch({ type: 'SAVE_SUCCESS', message: 'Created & Saved' })
+      setTimeout(() => dispatch({ type: 'CLEAR_NOTIFICATION' }), 2000)
       onFileSaved?.()
-    } catch (err) {
-      console.error('Failed to create file:', err)
-      showNotification('Failed to create file', 'error')
-    } finally {
-      setIsLoading(false)
+    } catch {
+      dispatch({ type: 'SET_ERROR', message: 'Failed to create file' })
     }
-  }, [newName, onFileSaved, showNotification])
-
-  const createNewFile = useCallback(() => {
-    setCurrentFile(null)
-    currentFileRef.current = null
-    setContent('# New Note\n')
-    contentRef.current = '# New Note\n'
-    setNotification(null)
-  }, [])
+  }, [state.newName, onFileSaved])
 
   return {
-    currentFile,
-    content,
-    notification, // Export notification instead of isSaved
-    isNamingOpen,
-    setIsNamingOpen,
-    newName,
-    setNewName,
-    isLoading,
+    ...state,
+    isDirty: state.content !== state.lastSavedContent,
+    setIsNamingOpen: (open: boolean) => dispatch({ type: 'SET_NAMING_OPEN', open }),
+    setNewName: (name: string) => dispatch({ type: 'SET_NEW_NAME', name }),
     handleContentChange,
     loadFileContent,
     saveFile,
     handleCreateWithName,
-    createNewFile,
+    createNewFile: () => dispatch({ type: 'NEW_FILE' }),
   }
 }

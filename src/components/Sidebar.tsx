@@ -11,7 +11,7 @@ function cn(...inputs: ClassValue[]) {
 
 export function Sidebar() {
   const { files, baseDir, changeBaseDir } = useFile()
-  const { currentFile, loadFileContent, createNewFile } = useEditor()
+  const { currentFile, loadFileContent, createNewFile, isDirty } = useEditor()
 
   return (
     <motion.aside
@@ -46,7 +46,10 @@ export function Sidebar() {
               size={14}
               className={currentFile === file ? 'text-blue-400' : 'text-zinc-500'}
             />
-            <span className="truncate">{file.replace('.md', '')}</span>
+            <span className="truncate flex-1 text-left">{file.replace('.md', '')}</span>
+            {currentFile === file && isDirty && (
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+            )}
           </button>
         ))}
       </div>

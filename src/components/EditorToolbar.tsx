@@ -11,6 +11,7 @@ function cn(...inputs: ClassValue[]) {
 interface EditorToolbarProps {
   currentFile: string | null
   viewMode: ViewMode
+  isDirty: boolean
   setViewMode: (mode: ViewMode | ((prev: ViewMode) => ViewMode)) => void
   toggleSidebar: () => void
   toggleSearch: () => void
@@ -46,6 +47,7 @@ function ViewButton({
 export const EditorToolbar = memo(function EditorToolbar({
   currentFile,
   viewMode,
+  isDirty,
   setViewMode,
   toggleSidebar,
   toggleSearch,
@@ -59,9 +61,16 @@ export const EditorToolbar = memo(function EditorToolbar({
         >
           <SidebarIcon size={18} />
         </button>
-        <h2 className="text-sm font-medium text-zinc-300 truncate max-w-[200px]">
-          {currentFile || 'Untitled'}
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-medium text-zinc-300 truncate max-w-[200px]">
+            {currentFile || 'Untitled'}
+          </h2>
+          {isDirty && (
+            <span className="text-[10px] text-blue-500 font-bold px-1.5 py-0.5 bg-blue-500/10 rounded border border-blue-500/20">
+              Modified
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5 bg-zinc-900/50 p-1 rounded-xl border border-white/5">

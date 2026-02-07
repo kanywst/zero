@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result as AnyhowResult};
 use pulldown_cmark::{html, Options, Parser};
 use std::fs;
 use std::path::PathBuf;
@@ -9,11 +8,9 @@ use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_store::StoreExt;
 
 #[derive(Debug, thiserror::Error)]
-enum Error {
+pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
-    #[error(transparent)]
-    Anyhow(#[from] anyhow::Error),
     #[error("{0}")]
     Generic(String),
 }
@@ -27,14 +24,13 @@ impl serde::Serialize for Error {
     }
 }
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
-struct AppState {
-    base_dir: Mutex<PathBuf>,
+pub struct AppState {
+    pub base_dir: Mutex<PathBuf>,
 }
 
-#[tauri::command]
-fn parse_markdown(content: String) -> String {
+pub fn parse_markdown_internal(content: String) -> String {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
     options.insert(Options::ENABLE_FOOTNOTES);
@@ -46,27 +42,37 @@ fn parse_markdown(content: String) -> String {
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
 
-    // 2026-era sophisticated sanitization
     let mut cleaner = ammonia::Builder::default();
     cleaner
         .add_generic_attributes(&["style", "class"])
-        .add_tags(&["input"]) // For task lists
-        .add_allowed_classes("input", &["task-list-item-checkbox"])
+        .add_tags(&["input"])
+        .add_tag_attributes("input", &["type", "checked", "disabled"])
         .link_rel(Some("noopener noreferrer"));
 
     cleaner.clean(&html_output).to_string()
 }
 
-fn get_default_dir(app: &tauri::AppHandle) -> PathBuf {
+#[tauri::command]
+fn parse_markdown(content: String) -> String {
+    parse_markdown_internal(content)
+}
+
+pub fn get_default_dir(app: &tauri::AppHandle) -> PathBuf {
     app.path().home_dir().unwrap_or_else(|_| PathBuf::from("/"))
 }
 
-fn get_resolved_base_dir(app: &tauri::AppHandle, state: &State<'_, AppState>) -> PathBuf {
-    let mut dir = state.base_dir.lock().expect("Mutex poisoned");
+pub fn get_resolved_base_dir(
+    app: &tauri::AppHandle,
+    state: &State<'_, AppState>,
+) -> Result<PathBuf> {
+    let mut dir = state
+        .base_dir
+        .lock()
+        .map_err(|_| Error::Generic("Mutex poisoned".into()))?;
     if dir.as_os_str().is_empty() {
         let store_result = app
             .get_store("settings.json")
-            .or_else(|| app.store("settings.json"));
+            .or_else(|| app.store("settings.json").ok());
 
         if let Some(store) = store_result {
             if let Some(saved_path) = store.get("base_dir") {
@@ -83,59 +89,63 @@ fn get_resolved_base_dir(app: &tauri::AppHandle, state: &State<'_, AppState>) ->
             *dir = get_default_dir(app);
         }
     }
-    dir.clone()
+    Ok(dir.clone())
 }
 
 #[tauri::command]
-fn get_base_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> String {
-    let dir = get_resolved_base_dir(&app, &state);
+fn get_base_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<String> {
+    let dir = get_resolved_base_dir(&app, &state)?;
     log::info!("Fetching base directory: {:?}", dir);
-    dir.to_string_lossy().to_string()
+    Ok(dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
-fn set_base_dir(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
-    new_path: String,
-) -> Result<()> {
+fn set_base_dir(app: tauri::AppHandle, state: State<'_, AppState>, new_path: String) -> Result<()> {
     let path = PathBuf::from(&new_path);
     if !path.exists() {
         log::warn!("Attempted to set non-existent directory: {}", new_path);
         return Err(Error::Generic("Selected directory does not exist.".into()));
     }
 
-    *state.base_dir.lock().expect("Mutex poisoned") = path;
+    *state
+        .base_dir
+        .lock()
+        .map_err(|_| Error::Generic("Mutex poisoned".into()))? = path;
 
     let store = app
         .get_store("settings.json")
-        .or_else(|| app.store("settings.json"))
+        .or_else(|| app.store("settings.json").ok())
         .ok_or_else(|| Error::Generic("Failed to access settings store".into()))?;
 
     store.set("base_dir", serde_json::json!(new_path));
     store.save().map_err(|e| Error::Generic(e.to_string()))?;
-    
+
     log::info!("Base directory updated to: {}", new_path);
     Ok(())
 }
 
 #[tauri::command]
-fn list_markdown_files(app: tauri::AppHandle, state: State<'_, AppState>) -> Vec<String> {
-    let base_dir = get_resolved_base_dir(&app, &state);
+fn list_markdown_files(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Vec<String>> {
+    let base_dir = get_resolved_base_dir(&app, &state)?;
     log::debug!("Listing files in: {:?}", base_dir);
 
     let mut files = Vec::new();
     if let Ok(entries) = fs::read_dir(base_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() && path.extension().is_some_and(|ext| ext == "md") {
-                if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
-                    files.push(name.to_string());
+            if path.is_file() {
+                if let Some(file_name) = path.file_name().and_then(|s| s.to_str()) {
+                    if !file_name.starts_with('.')
+                        && path.extension().is_some_and(|ext| ext == "md")
+                    {
+                        files.push(file_name.to_string());
+                    }
                 }
             }
         }
     }
-    files
+    files.sort();
+    Ok(files)
 }
 
 #[tauri::command]
@@ -144,10 +154,10 @@ async fn read_markdown_file(
     state: State<'_, AppState>,
     file_name: String,
 ) -> Result<String> {
-    let base_dir = get_resolved_base_dir(&app, &state);
+    let base_dir = get_resolved_base_dir(&app, &state)?;
     let file_path = base_dir.join(&file_name);
     log::info!("Reading file: {:?}", file_path);
-    
+
     let content = tokio::fs::read_to_string(&file_path).await.map_err(|e| {
         log::error!("Failed to read file {:?}: {}", file_path, e);
         Error::Io(e)
@@ -162,7 +172,7 @@ async fn write_markdown_file(
     file_name: String,
     content: String,
 ) -> Result<()> {
-    let base_dir = get_resolved_base_dir(&app, &state);
+    let base_dir = get_resolved_base_dir(&app, &state)?;
     let file_path = base_dir.join(&file_name);
     log::info!("Writing file: {:?}", file_path);
 
@@ -180,7 +190,6 @@ fn open_url(app: tauri::AppHandle, url: String) -> Result<()> {
         .map_err(|e| Error::Generic(e.to_string()))?;
     Ok(())
 }
-
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -200,16 +209,12 @@ pub fn run() {
             }
         }))
         .setup(|app| {
-            // Check CLI args on startup
             if let Ok(matches) = app.cli().matches() {
                 if let Some(arg) = matches.args.get("file") {
                     if let Some(file_path) = arg.value.as_str() {
                         let app_handle = app.handle().clone();
                         let file_path = file_path.to_string();
-                        std::thread::spawn(move || {
-                            std::thread::sleep(std::time::Duration::from_millis(500));
-                            let _ = app_handle.emit("open-file", file_path);
-                        });
+                        let _ = app_handle.emit("open-file", file_path);
                     }
                 }
             }
@@ -226,4 +231,32 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_markdown_basic() {
+        let input = "# Hello\nThis is **bold**.".to_string();
+        let output = parse_markdown_internal(input);
+        assert!(output.contains("<h1>Hello</h1>"));
+        assert!(output.contains("<strong>bold</strong>"));
+    }
+
+    #[test]
+    fn test_parse_markdown_sanitization() {
+        let input = "Hello <script>alert('xss')</script> world".to_string();
+        let output = parse_markdown_internal(input);
+        assert!(!output.contains("<script>"));
+        assert!(output.contains("Hello  world"));
+    }
+
+    #[test]
+    fn test_parse_markdown_gfm() {
+        let input = "- [x] Task 1\n- [ ] Task 2".to_string();
+        let output = parse_markdown_internal(input);
+        assert!(output.contains("type=\"checkbox\""));
+    }
 }
