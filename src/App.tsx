@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useDeferredValue, useTransition } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open as selectFolder } from '@tauri-apps/plugin-dialog'
@@ -7,6 +7,7 @@ import { keymap } from '@codemirror/view'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { Extension } from '@codemirror/state'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText,
@@ -33,6 +34,8 @@ export default function App() {
   const [files, setFiles] = useState<string[]>([])
   const [currentFile, setCurrentFile] = useState<string | null>(null)
   const [content, setContent] = useState('')
+  const [, startTransition] = useTransition()
+  const deferredContent = useDeferredValue(content)
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -44,13 +47,16 @@ export default function App() {
   const currentFileRef = useRef(currentFile)
   const contentRef = useRef(content)
 
-  useEffect(() => {
-    currentFileRef.current = currentFile
-  }, [currentFile])
+  const handleContentChange = useCallback((value: string) => {
+    // Immediate state update for input responsiveness
+    setContent(value)
+    setIsSaved(false)
 
-  useEffect(() => {
-    contentRef.current = content
-  }, [content])
+    // Low-priority ref sync for other components
+    startTransition(() => {
+      contentRef.current = value
+    })
+  }, [])
 
   const loadFiles = useCallback(async () => {
     try {
@@ -131,7 +137,7 @@ export default function App() {
     }
   }, [loadFiles])
 
-  const [extensions, setExtensions] = useState<any[]>([])
+  const [extensions, setExtensions] = useState<Extension[]>([])
   const saveFileRef = useRef(saveFile)
 
   useEffect(() => {
@@ -333,42 +339,42 @@ export default function App() {
         </header>
 
         <div className="flex-1 flex overflow-hidden">
-          {(viewMode === 'edit' || viewMode === 'split') && (
-            <div
-              className={cn(
-                'h-full overflow-auto',
-                viewMode === 'split' ? 'w-1/2 border-r border-white/5' : 'w-full',
-              )}
-            >
-              <CodeMirror
-                value={content}
-                height="100%"
-                theme={oneDark}
-                extensions={extensions}
-                onChange={(value) => {
-                  setContent(value)
-                  setIsSaved(false)
-                }}
-                basicSetup={{
-                  lineNumbers: false,
-                  foldGutter: false,
-                  highlightActiveLine: true,
-                }}
-                className="text-lg"
-              />
-            </div>
-          )}
+          <div
+            className={cn(
+              'h-full overflow-auto transition-all duration-300',
+              viewMode === 'edit' ? 'w-full opacity-100 visible' : '',
+              viewMode === 'split' ? 'w-1/2 opacity-100 visible border-r border-white/5' : '',
+              viewMode === 'preview' ? 'w-0 opacity-0 invisible overflow-hidden' : '',
+            )}
+          >
+            <CodeMirror
+              value={content}
+              height="100%"
+              theme={oneDark}
+              extensions={extensions}
+              onChange={handleContentChange}
+              basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: true }}
+              className="text-lg"
+            />
+          </div>
 
-          {(viewMode === 'preview' || viewMode === 'split') && (
+          <div
+            className={cn(
+              'h-full overflow-auto transition-all duration-300',
+              viewMode === 'preview' ? 'w-full opacity-100 visible' : '',
+              viewMode === 'split' ? 'w-1/2 opacity-100 visible' : '',
+              viewMode === 'edit' ? 'w-0 opacity-0 invisible overflow-hidden' : '',
+            )}
+          >
             <div
               className={cn(
-                'h-full overflow-auto p-8 lg:p-12 prose prose-invert max-w-none bg-[#0d0d0d]',
-                viewMode === 'split' ? 'w-1/2' : 'w-full mx-auto max-w-4xl',
+                'p-8 lg:p-12 prose prose-invert max-w-none bg-[#0d0d0d]',
+                viewMode === 'split' ? '' : 'mx-auto max-w-4xl',
               )}
             >
-              <MarkdownRenderer content={content} />
+              <MarkdownRenderer content={deferredContent} />
             </div>
-          )}
+          </div>
         </div>
 
         <AnimatePresence>

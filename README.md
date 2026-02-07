@@ -45,7 +45,7 @@ brew install zero
 git clone https://github.com/kanywst/zero
 
 # Enter the workspace
-cd zero/ZeroEditor
+cd zero
 
 # Install & Run
 npm install

@@ -1,3 +1,4 @@
+use pulldown_cmark::{html, Options, Parser};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -7,6 +8,21 @@ use tauri_plugin_opener::OpenerExt;
 
 struct AppState {
     base_dir: Mutex<PathBuf>,
+}
+
+#[tauri::command]
+fn parse_markdown(content: String) -> String {
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_FOOTNOTES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+    options.insert(Options::ENABLE_SMART_PUNCTUATION);
+
+    let parser = Parser::new_ext(&content, options);
+    let mut html_output = String::new();
+    html::push_html(&mut html_output, parser);
+    html_output
 }
 
 fn get_default_dir(app: &tauri::AppHandle) -> PathBuf {
@@ -127,7 +143,8 @@ pub fn run() {
             list_markdown_files,
             read_markdown_file,
             write_markdown_file,
-            open_url
+            open_url,
+            parse_markdown
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

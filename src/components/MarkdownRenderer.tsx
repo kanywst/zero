@@ -1,93 +1,111 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { twMerge } from 'tailwind-merge'
 import { clsx, type ClassValue } from 'clsx'
+import mermaid from 'mermaid'
+import morphdom from 'morphdom'
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const MarkdownLink = ({
-  href,
-  children,
-  ...props
-}: {
-  href?: string
-  children?: React.ReactNode
-}) => (
-  <a
-    {...props}
-    href={href}
-    onClick={(e) => {
-      e.preventDefault()
-      if (href) invoke('open_url', { url: href })
-    }}
-  >
-    {children}
-  </a>
-)
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  securityLevel: 'loose',
+})
 
-export const MarkdownCode = ({
-  inline,
-  className,
-  children,
-  ...props
-}: {
-  inline?: boolean
-  className?: string
-  children?: React.ReactNode
-}) => {
-  const match = /language-(\w+)/.exec(className || '')
-  const [diagram, setDiagram] = useState('')
+export const MarkdownRenderer = memo(
+  ({ content, className }: { content: string; className?: string }) => {
+    const [html, setHtml] = useState('')
+    const containerRef = useRef<HTMLDivElement>(null)
+    const hiddenDivRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!inline && match?.[1] === 'mermaid') {
-      import('mermaid').then((m) => {
-        m.default.initialize({ startOnLoad: true, theme: 'dark' })
-        m.default
-          .render(`mermaid-${Math.random().toString(36).substr(2, 9)}`, String(children))
-          .then(({ svg }) => {
-            setDiagram(svg)
-          })
+    // Parallel parsing in Rust
+    useEffect(() => {
+      let active = true
+      const parse = async () => {
+        const result: string = await invoke('parse_markdown', { content })
+        if (active) setHtml(result)
+      }
+      parse()
+      return () => {
+        active = false
+      }
+    }, [content])
+
+    // Ultra-fast incremental DOM patching
+    useEffect(() => {
+      if (!containerRef.current || !html) return
+
+      if (!hiddenDivRef.current) {
+        hiddenDivRef.current = document.createElement('div')
+      }
+
+      // Patch the current DOM with the new HTML using morphdom (incremental updates)
+      hiddenDivRef.current.innerHTML = html
+
+      morphdom(containerRef.current, hiddenDivRef.current, {
+        childrenOnly: true,
+        onBeforeElUpdated: (fromEl, toEl) => {
+          // Optimization: Don't re-render mermaid blocks if content is identical
+          if (
+            fromEl.classList.contains('mermaid-processed') &&
+            fromEl.textContent === toEl.textContent
+          ) {
+            return false
+          }
+          return true
+        },
       })
-    }
-  }, [children, inline, match])
 
-  if (!inline && match?.[1] === 'mermaid') {
+      // Handle links and post-processing
+      const links = containerRef.current.querySelectorAll('a')
+      links.forEach((link) => {
+        link.onclick = (e) => {
+          e.preventDefault()
+          const href = link.getAttribute('href')
+          if (href) invoke('open_url', { url: href })
+        }
+      })
+
+      // Handle Mermaid (Incremental rendering)
+      const codeBlocks = containerRef.current.querySelectorAll('pre > code.language-mermaid')
+      codeBlocks.forEach(async (block) => {
+        if (block.classList.contains('mermaid-processed')) return
+
+        const pre = block.parentElement
+        if (!pre) return
+
+        try {
+          const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`
+          const { svg } = await mermaid.render(id, block.textContent || '')
+          pre.innerHTML = svg
+          block.classList.add('mermaid-processed')
+          pre.classList.add(
+            'flex',
+            'justify-center',
+            'my-6',
+            'bg-zinc-900/50',
+            'p-6',
+            'rounded-xl',
+            'border',
+            'border-white/5',
+            'overflow-x-auto',
+          )
+        } catch {
+          pre.innerHTML = `<div class="text-red-400 text-xs p-4">Mermaid Error</div>`
+        }
+      })
+    }, [html])
+
     return (
       <div
-        className="flex justify-center my-6 bg-zinc-900/50 p-6 rounded-xl border border-white/5"
-        dangerouslySetInnerHTML={{ __html: diagram }}
+        ref={containerRef}
+        className={cn('markdown-preview prose prose-invert max-w-none', className)}
       />
     )
-  }
-  return (
-    <code className={cn('bg-zinc-800 px-1.5 py-0.5 rounded text-sm', className)} {...props}>
-      {children}
-    </code>
-  )
-}
+  },
+)
 
-export const MarkdownRenderer = ({
-  content,
-  className,
-}: {
-  content: string
-  className?: string
-}) => {
-  return (
-    <div className={cn('markdown-preview', className)}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          a: MarkdownLink,
-          code: MarkdownCode,
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  )
-}
+MarkdownRenderer.displayName = 'MarkdownRenderer'
