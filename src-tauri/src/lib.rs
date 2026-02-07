@@ -46,7 +46,15 @@ fn parse_markdown(content: String) -> String {
     let mut html_output = String::new();
     html::push_html(&mut html_output, parser);
 
-    ammonia::clean(&html_output)
+    // 2026-era sophisticated sanitization
+    let mut cleaner = ammonia::Builder::default();
+    cleaner
+        .add_generic_attributes(&["style", "class"])
+        .add_tags(&["input"]) // For task lists
+        .add_allowed_classes("input", &["task-list-item-checkbox"])
+        .link_rel(Some("noopener noreferrer"));
+
+    cleaner.clean(&html_output).to_string()
 }
 
 fn get_default_dir(app: &tauri::AppHandle) -> PathBuf {

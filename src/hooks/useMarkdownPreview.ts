@@ -33,11 +33,11 @@ export function useMarkdownPreview(content: string) {
       hiddenDivRef.current = document.createElement('div')
     }
 
-    // Patch DOM
-    hiddenDivRef.current.innerHTML = html
+    // Patch DOM with optimized checks
     morphdom(containerRef.current, hiddenDivRef.current, {
       childrenOnly: true,
       onBeforeElUpdated: (fromEl, toEl) => {
+        if (fromEl.isEqualNode(toEl)) return false
         if (
           fromEl.classList.contains('mermaid-processed') &&
           fromEl.textContent === toEl.textContent
@@ -48,18 +48,22 @@ export function useMarkdownPreview(content: string) {
       },
     })
 
-    // Handle Links
-    const links = containerRef.current.querySelectorAll('a')
-    links.forEach((link) => {
-      link.onclick = (e) => {
+    // Delegated event handling for better performance
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const link = target.closest('a')
+      if (link) {
         e.preventDefault()
         const href = link.getAttribute('href')
         if (href) invoke('open_url', { url: href })
       }
-    })
+    }
 
-    // Handle Mermaid
-    const codeBlocks = containerRef.current.querySelectorAll('pre > code.language-mermaid')
+    const container = containerRef.current
+    container.addEventListener('click', handleClick)
+
+    // Handle Mermaid (Incremental rendering)
+    const codeBlocks = container.querySelectorAll('pre > code.language-mermaid')
     codeBlocks.forEach(async (block) => {
       if (block.classList.contains('mermaid-processed')) return
 
@@ -86,6 +90,8 @@ export function useMarkdownPreview(content: string) {
         pre.innerHTML = `<div class="text-red-400 text-xs p-4">Mermaid Error</div>`
       }
     })
+
+    return () => container.removeEventListener('click', handleClick)
   }, [html])
 
   return containerRef

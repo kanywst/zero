@@ -2,28 +2,17 @@ import { motion } from 'framer-motion'
 import { FileText, Plus, FolderOpen, Settings } from 'lucide-react'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { useFile } from '../contexts/FileContext'
+import { useEditor } from '../contexts/EditorContext'
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-interface SidebarProps {
-  files: string[]
-  currentFile: string | null
-  baseDir: string
-  loadFileContent: (file: string) => void
-  createNewFile: () => void
-  changeBaseDir: () => void
-}
+export function Sidebar() {
+  const { files, baseDir, changeBaseDir } = useFile()
+  const { currentFile, loadFileContent, createNewFile } = useEditor()
 
-export function Sidebar({
-  files,
-  currentFile,
-  baseDir,
-  loadFileContent,
-  createNewFile,
-  changeBaseDir,
-}: SidebarProps) {
   return (
     <motion.aside
       initial={{ width: 0, opacity: 0 }}

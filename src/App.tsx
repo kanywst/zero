@@ -10,6 +10,7 @@ import { Sidebar } from './components/Sidebar'
 import { EditorToolbar } from './components/EditorToolbar'
 import { EditorCore } from './components/EditorCore'
 import { EditorProvider, useEditor } from './contexts/EditorContext'
+import { FileProvider, useFile } from './contexts/FileContext'
 import { useAppEvents } from './hooks/useAppEvents'
 import { ViewMode } from './types/editor'
 
@@ -19,10 +20,8 @@ function cn(...inputs: ClassValue[]) {
 
 function EditorShell() {
   const {
-    files,
     currentFile,
     content,
-    baseDir,
     isSaved,
     isNamingOpen,
     setIsNamingOpen,
@@ -31,7 +30,6 @@ function EditorShell() {
     loadFileContent,
     saveFile,
     handleCreateWithName,
-    changeBaseDir,
     createNewFile,
   } = useEditor()
 
@@ -40,6 +38,7 @@ function EditorShell() {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const deferredContent = useDeferredValue(content)
 
+  // Register shortcuts and events
   useAppEvents({
     saveFile,
     createNewFile,
@@ -49,20 +48,14 @@ function EditorShell() {
     setIsSidebarOpen,
   })
 
+  // Connect File/Editor interactions (e.g. CLI open) are handled inside hooks/contexts mostly,
+  // but useAppEvents bridges the imperative gap.
+
+  const { files } = useFile() // Used only for Search (CommandMenu)
+
   return (
     <div className="flex h-screen w-full bg-[#0a0a0a] text-white overflow-hidden selection:bg-blue-500/30">
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <Sidebar
-            files={files}
-            currentFile={currentFile}
-            baseDir={baseDir}
-            loadFileContent={loadFileContent}
-            createNewFile={createNewFile}
-            changeBaseDir={changeBaseDir}
-          />
-        )}
-      </AnimatePresence>
+      <AnimatePresence>{isSidebarOpen && <Sidebar />}</AnimatePresence>
 
       <main className="flex-1 flex flex-col relative min-w-0">
         <EditorToolbar
@@ -225,8 +218,10 @@ function EditorShell() {
 
 export default function App() {
   return (
-    <EditorProvider>
-      <EditorShell />
-    </EditorProvider>
+    <FileProvider>
+      <EditorProvider>
+        <EditorShell />
+      </EditorProvider>
+    </FileProvider>
   )
 }

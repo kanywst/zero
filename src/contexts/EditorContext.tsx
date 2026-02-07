@@ -1,14 +1,8 @@
 import { createContext, useContext, ReactNode } from 'react'
-import { useFileExplorer } from '../hooks/useFileExplorer'
 import { useEditorState } from '../hooks/useEditorState'
+import { useFile } from './FileContext'
 
 interface EditorContextType {
-  // Explorer
-  files: string[]
-  baseDir: string
-  changeBaseDir: () => void
-
-  // Editor
   currentFile: string | null
   content: string
   isSaved: boolean
@@ -17,24 +11,19 @@ interface EditorContextType {
   newName: string
   setNewName: (name: string) => void
   handleContentChange: (value: string) => void
-  loadFileContent: (file: string) => void
-  saveFile: () => void
-  handleCreateWithName: () => void
+  loadFileContent: (file: string) => Promise<void>
+  saveFile: () => Promise<void>
+  handleCreateWithName: () => Promise<void>
   createNewFile: () => void
 }
 
 const EditorContext = createContext<EditorContextType | undefined>(undefined)
 
 export function EditorProvider({ children }: { children: ReactNode }) {
-  const explorer = useFileExplorer()
-  const editor = useEditorState(explorer.loadFiles)
+  const { loadFiles } = useFile() // Dependency injection from FileContext
+  const editor = useEditorState(loadFiles)
 
-  const value: EditorContextType = {
-    ...explorer,
-    ...editor,
-  }
-
-  return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
+  return <EditorContext.Provider value={editor}>{children}</EditorContext.Provider>
 }
 
 export function useEditor() {

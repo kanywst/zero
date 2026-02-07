@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Sidebar as SidebarIcon, FileText, Columns, Maximize2, Search } from 'lucide-react'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
@@ -42,7 +43,7 @@ function ViewButton({
   )
 }
 
-export function EditorToolbar({
+export const EditorToolbar = memo(function EditorToolbar({
   currentFile,
   viewMode,
   setViewMode,
@@ -98,4 +99,4 @@ export function EditorToolbar({
       </div>
     </header>
   )
-}
+})
