@@ -4,8 +4,8 @@ use crate::utils::{ensure_safe_path, get_default_dir, parse_markdown_internal};
 use std::fs;
 use std::path::PathBuf;
 use tauri::State;
-use tauri_plugin_store::StoreExt;
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_store::StoreExt;
 
 pub fn get_resolved_base_dir(
     app: &tauri::AppHandle,
