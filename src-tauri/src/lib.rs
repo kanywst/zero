@@ -135,18 +135,19 @@ fn list_markdown_files(app: tauri::AppHandle, state: State<'_, AppState>) -> Vec
 }
 
 #[tauri::command]
-fn read_markdown_file(
+async fn read_markdown_file(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     file_name: String,
 ) -> Result<String> {
     let base_dir = get_resolved_base_dir(&app, &state);
     let file_path = base_dir.join(file_name);
-    Ok(fs::read_to_string(file_path)?)
+    let content = tokio::fs::read_to_string(file_path).await?;
+    Ok(content)
 }
 
 #[tauri::command]
-fn write_markdown_file(
+async fn write_markdown_file(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     file_name: String,
@@ -154,7 +155,7 @@ fn write_markdown_file(
 ) -> Result<()> {
     let base_dir = get_resolved_base_dir(&app, &state);
     let file_path = base_dir.join(file_name);
-    fs::write(file_path, content)?;
+    tokio::fs::write(file_path, content).await?;
     Ok(())
 }
 
@@ -173,6 +174,7 @@ pub fn run() {
         .manage(AppState {
             base_dir: Mutex::new(PathBuf::new()),
         })
+        .plugin(tauri_plugin_log::Builder::default().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())

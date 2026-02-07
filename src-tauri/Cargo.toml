@@ -31,4 +31,6 @@ pulldown-cmark = "0.13.0"
 ammonia = "4.1.2"
 anyhow = "1.0.101"
 thiserror = "2.0.18"
+tauri-plugin-log = "2.8.0"
+log = "0.4.29"
 

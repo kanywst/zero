@@ -7,6 +7,7 @@ export function useEditorState(onFileSaved?: () => void) {
   const [isSaved, setIsSaved] = useState(false)
   const [isNamingOpen, setIsNamingOpen] = useState(false)
   const [newName, setNewName] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   const currentFileRef = useRef(currentFile)
   const contentRef = useRef(content)
@@ -18,6 +19,7 @@ export function useEditorState(onFileSaved?: () => void) {
   }, [])
 
   const loadFileContent = useCallback(async (fileName: string) => {
+    setIsLoading(true)
     try {
       const result: string = await invoke('read_markdown_file', { fileName })
       setContent(result)
@@ -28,6 +30,8 @@ export function useEditorState(onFileSaved?: () => void) {
       setIsNamingOpen(false)
     } catch (err) {
       console.error('Failed to read file:', err)
+    } finally {
+      setIsLoading(false)
     }
   }, [])
 
@@ -39,6 +43,8 @@ export function useEditorState(onFileSaved?: () => void) {
       setIsNamingOpen(true)
       return
     }
+
+    setIsLoading(true)
     try {
       await invoke('write_markdown_file', {
         fileName: fileToSave,
@@ -49,6 +55,8 @@ export function useEditorState(onFileSaved?: () => void) {
       onFileSaved?.()
     } catch (err) {
       console.error('Failed to save file:', err)
+    } finally {
+      setIsLoading(false)
     }
   }, [onFileSaved])
 
@@ -56,6 +64,8 @@ export function useEditorState(onFileSaved?: () => void) {
     if (!newName) return
     const fileName = newName.endsWith('.md') ? newName : `${newName}.md`
     const contentToSave = contentRef.current
+
+    setIsLoading(true)
     try {
       await invoke('write_markdown_file', {
         fileName,
@@ -70,6 +80,8 @@ export function useEditorState(onFileSaved?: () => void) {
       onFileSaved?.()
     } catch (err) {
       console.error('Failed to create file:', err)
+    } finally {
+      setIsLoading(false)
     }
   }, [newName, onFileSaved])
 
@@ -89,6 +101,7 @@ export function useEditorState(onFileSaved?: () => void) {
     setIsNamingOpen,
     newName,
     setNewName,
+    isLoading, // Export isLoading
     handleContentChange,
     loadFileContent,
     saveFile,

@@ -8,20 +8,21 @@ export function useMarkdownPreview(content: string) {
   const containerRef = useRef<HTMLDivElement>(null)
   const hiddenDivRef = useRef<HTMLDivElement>(null)
 
-  // Parse markdown in Rust (now sanitized with ammonia)
+  // Parse markdown in Rust with a small debounce to batch rapid updates
   useEffect(() => {
     let active = true
-    const parse = async () => {
+    const timeoutId = setTimeout(async () => {
       try {
         const result: string = await invoke('parse_markdown', { content })
         if (active) setHtml(result)
       } catch (err) {
         console.error('Failed to parse markdown:', err)
       }
-    }
-    parse()
+    }, 50) // 50ms micro-debounce: invisible to humans, huge for CPU/IPC
+
     return () => {
       active = false
+      clearTimeout(timeoutId)
     }
   }, [content])
 

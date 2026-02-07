@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, ReactNode, useMemo } from 'react'
 import { useEditorState } from '../hooks/useEditorState'
 import { useFile } from './FileContext'
 
@@ -7,6 +7,7 @@ interface EditorContextType {
   content: string
   isSaved: boolean
   isNamingOpen: boolean
+  isLoading: boolean
   setIsNamingOpen: (open: boolean) => void
   newName: string
   setNewName: (name: string) => void
@@ -23,7 +24,14 @@ export function EditorProvider({ children }: { children: ReactNode }) {
   const { loadFiles } = useFile() // Dependency injection from FileContext
   const editor = useEditorState(loadFiles)
 
-  return <EditorContext.Provider value={editor}>{children}</EditorContext.Provider>
+  const value = useMemo(
+    () => ({
+      ...editor,
+    }),
+    [editor],
+  )
+
+  return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>
 }
 
 export function useEditor() {

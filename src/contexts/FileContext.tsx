@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react'
+import { createContext, useContext, ReactNode, useMemo } from 'react'
 import { useFileExplorer } from '../hooks/useFileExplorer'
 
 interface FileContextType {
@@ -13,7 +13,14 @@ const FileContext = createContext<FileContextType | undefined>(undefined)
 export function FileProvider({ children }: { children: ReactNode }) {
   const explorer = useFileExplorer()
 
-  return <FileContext.Provider value={explorer}>{children}</FileContext.Provider>
+  const value = useMemo(
+    () => ({
+      ...explorer,
+    }),
+    [explorer],
+  )
+
+  return <FileContext.Provider value={value}>{children}</FileContext.Provider>
 }
 
 export function useFile() {
