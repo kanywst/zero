@@ -28,4 +28,7 @@ tauri-plugin-store = "2.4.2"
 tauri-plugin-cli = "2.4.1"
 tauri-plugin-single-instance = "2.4.0"
 pulldown-cmark = "0.13.0"
+ammonia = "4.1.2"
+anyhow = "1.0.101"
+thiserror = "2.0.18"
 

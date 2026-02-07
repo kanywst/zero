@@ -1,21 +1,15 @@
-import { useState, useEffect, useDeferredValue, useRef } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
-import { keymap } from '@codemirror/view'
-import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { languages } from '@codemirror/language-data'
-import { oneDark } from '@codemirror/theme-one-dark'
-import { Extension } from '@codemirror/state'
+import { useState, useDeferredValue } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Command as CommandMenu } from 'cmdk'
-import { Search, FileText, Command } from 'lucide-react'
+import { Search, FileText } from 'lucide-react'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
 import { MarkdownRenderer } from './components/MarkdownRenderer'
 import { Sidebar } from './components/Sidebar'
 import { EditorToolbar } from './components/EditorToolbar'
-import { useFileExplorer } from './hooks/useFileExplorer'
-import { useEditorState } from './hooks/useEditorState'
+import { EditorCore } from './components/EditorCore'
+import { EditorProvider, useEditor } from './contexts/EditorContext'
 import { useAppEvents } from './hooks/useAppEvents'
 import { ViewMode } from './types/editor'
 
@@ -23,53 +17,29 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export default function App() {
-  const { files, baseDir, loadFiles, changeBaseDir } = useFileExplorer()
+function EditorShell() {
   const {
+    files,
     currentFile,
     content,
+    baseDir,
     isSaved,
     isNamingOpen,
     setIsNamingOpen,
     newName,
     setNewName,
-    handleContentChange,
     loadFileContent,
     saveFile,
     handleCreateWithName,
+    changeBaseDir,
     createNewFile,
-  } = useEditorState(loadFiles)
+  } = useEditor()
 
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const [extensions, setExtensions] = useState<Extension[]>([])
-
   const deferredContent = useDeferredValue(content)
-  const saveFileRef = useRef(saveFile)
 
-  // Sync ref for CodeMirror extension
-  useEffect(() => {
-    saveFileRef.current = saveFile
-  }, [saveFile])
-
-  // Initialize CodeMirror extensions
-  useEffect(() => {
-    setExtensions([
-      markdown({ base: markdownLanguage, codeLanguages: languages }),
-      keymap.of([
-        {
-          key: 'Mod-s',
-          run: () => {
-            saveFileRef.current()
-            return true
-          },
-        },
-      ]),
-    ])
-  }, [])
-
-  // Setup App Events (Shortcuts & IPC)
   useAppEvents({
     saveFile,
     createNewFile,
@@ -112,15 +82,7 @@ export default function App() {
               viewMode === 'preview' ? 'w-0 opacity-0 invisible overflow-hidden' : '',
             )}
           >
-            <CodeMirror
-              value={content}
-              height="100%"
-              theme={oneDark}
-              extensions={extensions}
-              onChange={handleContentChange}
-              basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: true }}
-              className="text-lg"
-            />
+            <EditorCore />
           </div>
 
           <div
@@ -257,29 +219,14 @@ export default function App() {
           </div>
         )}
       </AnimatePresence>
-
-      <div className="fixed bottom-4 right-4 flex items-center gap-3 pointer-events-none">
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="bg-zinc-900/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/5 flex items-center gap-3 text-[10px] text-zinc-500 font-medium"
-        >
-          <div className="flex items-center gap-1.5">
-            <Command size={10} />
-            <span>S Save</span>
-          </div>
-          <div className="w-1 h-1 rounded-full bg-zinc-700" />
-          <div className="flex items-center gap-1.5">
-            <Command size={10} />
-            <span>A Preview</span>
-          </div>
-          <div className="w-1 h-1 rounded-full bg-zinc-700" />
-          <div className="flex items-center gap-1.5">
-            <Command size={10} />
-            <span>K Search</span>
-          </div>
-        </motion.div>
-      </div>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <EditorProvider>
+      <EditorShell />
+    </EditorProvider>
   )
 }
