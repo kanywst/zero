@@ -23,6 +23,19 @@
       "csp": null
     }
   },
+  "plugins": {
+    "cli": {
+      "description": "Zero CLI",
+      "args": [
+        {
+          "name": "file",
+          "description": "The file to open",
+          "index": 1,
+          "takesValue": true
+        }
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",

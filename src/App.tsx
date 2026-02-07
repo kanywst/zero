@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { open as selectFolder } from '@tauri-apps/plugin-dialog'
 import CodeMirror from '@uiw/react-codemirror'
 import { keymap } from '@codemirror/view'
@@ -189,6 +190,19 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [saveFile, createNewFile])
+
+  useEffect(() => {
+    const unlisten = listen<string>('open-file', (event) => {
+      const filePath = event.payload
+      // If it's just a filename, load it. If it's a full path, we might need more logic, 
+      // but for now, we assume it's in the current base directory or handle it as a name.
+      const fileName = filePath.split('/').pop() || filePath
+      loadFileContent(fileName)
+    })
+    return () => {
+      unlisten.then((f) => f())
+    }
+  }, [loadFileContent])
 
   useEffect(() => {
     let isMounted = true

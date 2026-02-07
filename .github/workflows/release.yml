@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*' # v0.1.0 のようなタグがプッシュされた時のみ実行
+
+jobs:
+  publish:
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build and Publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__ # tauri.conf.json のバージョンを自動取得
+          releaseName: 'Zero v__VERSION__'
+          releaseBody: 'See the assets below for the latest installers.'
+          releaseDraft: true # 最初は下書きとして作成（確認後に公開）
+          prerelease: false

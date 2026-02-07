@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
+use tauri_plugin_cli::CliExt;
 use tauri_plugin_opener::OpenerExt;
 
 struct AppState {
@@ -24,7 +25,6 @@ fn get_base_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> String {
 #[tauri::command]
 fn set_base_dir(state: State<'_, AppState>, new_path: String) -> Result<(), String> {
     let path = PathBuf::from(new_path);
-    // Do not create directory automatically, assume user selects an existing one
     if !path.exists() {
         return Err("Selected directory does not exist.".to_string());
     }
@@ -43,7 +43,6 @@ fn list_markdown_files(app: tauri::AppHandle, state: State<'_, AppState>) -> Vec
     if let Ok(entries) = fs::read_dir(&*base_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            // List only markdown files in the top level of the selected directory
             if path.is_file() && path.extension().is_some_and(|ext| ext == "md") {
                 if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
                     files.push(name.to_string());
@@ -100,6 +99,28 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_cli::init())
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if let Some(file) = args.get(1) {
+                let _ = app.emit("open-file", file);
+            }
+        }))
+        .setup(|app| {
+            // Check CLI args on startup
+            if let Ok(matches) = app.cli().matches() {
+                if let Some(arg) = matches.args.get("file") {
+                    if let Some(file_path) = arg.value.as_str() {
+                        let app_handle = app.handle().clone();
+                        let file_path = file_path.to_string();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(std::time::Duration::from_millis(500));
+                            let _ = app_handle.emit("open-file", file_path);
+                        });
+                    }
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_base_dir,
             set_base_dir,
