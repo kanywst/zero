@@ -194,7 +194,7 @@ export default function App() {
   useEffect(() => {
     const unlisten = listen<string>('open-file', (event) => {
       const filePath = event.payload
-      // If it's just a filename, load it. If it's a full path, we might need more logic, 
+      // If it's just a filename, load it. If it's a full path, we might need more logic,
       // but for now, we assume it's in the current base directory or handle it as a name.
       const fileName = filePath.split('/').pop() || filePath
       loadFileContent(fileName)
