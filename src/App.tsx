@@ -15,15 +15,8 @@ import { cn } from './lib/utils'
 import { ViewMode } from './types/editor'
 
 function EditorShell() {
-  const {
-    currentFile,
-    content,
-    notification,
-    isDirty,
-    loadFileContent,
-    saveFile,
-    createNewFile,
-  } = useEditor()
+  const { currentFile, content, notification, isDirty, loadFileContent, saveFile, createNewFile } =
+    useEditor()
 
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>('zero-view-mode', 'edit')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -86,7 +79,9 @@ function EditorShell() {
         </div>
 
         <AnimatePresence>
-          {isSearchOpen && <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />}
+          {isSearchOpen && (
+            <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+          )}
         </AnimatePresence>
 
         <AnimatePresence>

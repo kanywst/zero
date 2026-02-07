@@ -23,7 +23,7 @@ export function useFileExplorer() {
         multiple: false,
         title: 'Select Notes Directory',
       })
-      
+
       if (selected && typeof selected === 'string') {
         await apiSetBaseDir(selected)
         await loadFiles()
