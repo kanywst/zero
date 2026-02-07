@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useDeferredValue, useTransition } from 'react'
+import { useState, useEffect, useCallback, useRef, useDeferredValue } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open as selectFolder } from '@tauri-apps/plugin-dialog'
@@ -34,7 +34,6 @@ export default function App() {
   const [files, setFiles] = useState<string[]>([])
   const [currentFile, setCurrentFile] = useState<string | null>(null)
   const [content, setContent] = useState('')
-  const [, startTransition] = useTransition()
   const deferredContent = useDeferredValue(content)
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -48,14 +47,9 @@ export default function App() {
   const contentRef = useRef(content)
 
   const handleContentChange = useCallback((value: string) => {
-    // Immediate state update for input responsiveness
     setContent(value)
+    contentRef.current = value
     setIsSaved(false)
-
-    // Low-priority ref sync for other components
-    startTransition(() => {
-      contentRef.current = value
-    })
   }, [])
 
   const loadFiles = useCallback(async () => {
@@ -73,7 +67,9 @@ export default function App() {
     try {
       const result: string = await invoke('read_markdown_file', { fileName })
       setContent(result)
+      contentRef.current = result
       setCurrentFile(fileName)
+      currentFileRef.current = fileName
       setIsSaved(false)
       setIsNamingOpen(false)
     } catch (err) {
@@ -105,12 +101,14 @@ export default function App() {
   const handleCreateWithName = useCallback(async () => {
     if (!newName) return
     const fileName = newName.endsWith('.md') ? newName : `${newName}.md`
+    const contentToSave = contentRef.current
     try {
       await invoke('write_markdown_file', {
         fileName,
-        content: contentRef.current,
+        content: contentToSave,
       })
       setCurrentFile(fileName)
+      currentFileRef.current = fileName
       setIsNamingOpen(false)
       setIsSaved(true)
       setNewName('')
@@ -161,7 +159,9 @@ export default function App() {
 
   const createNewFile = useCallback(() => {
     setCurrentFile(null)
+    currentFileRef.current = null
     setContent('# New Note\n')
+    contentRef.current = '# New Note\n'
     setIsSaved(false)
   }, [])
 

@@ -5,6 +5,7 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_cli::CliExt;
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_store::StoreExt;
 
 struct AppState {
     base_dir: Mutex<PathBuf>,
@@ -33,18 +34,40 @@ fn get_default_dir(app: &tauri::AppHandle) -> PathBuf {
 fn get_base_dir(app: tauri::AppHandle, state: State<'_, AppState>) -> String {
     let mut dir = state.base_dir.lock().unwrap();
     if dir.as_os_str().is_empty() {
-        *dir = get_default_dir(&app);
+        // Load from store
+        let store = app.get_store("settings.json").unwrap_or_else(|| {
+            app.store("settings.json").unwrap()
+        });
+        
+        if let Some(saved_path) = store.get("base_dir") {
+            if let Some(path_str) = saved_path.as_str() {
+                let path = PathBuf::from(path_str);
+                if path.exists() {
+                    *dir = path;
+                }
+            }
+        }
+        
+        if dir.as_os_str().is_empty() {
+            *dir = get_default_dir(&app);
+        }
     }
     dir.to_string_lossy().to_string()
 }
 
 #[tauri::command]
-fn set_base_dir(state: State<'_, AppState>, new_path: String) -> Result<(), String> {
-    let path = PathBuf::from(new_path);
+fn set_base_dir(app: tauri::AppHandle, state: State<'_, AppState>, new_path: String) -> Result<(), String> {
+    let path = PathBuf::from(&new_path);
     if !path.exists() {
         return Err("Selected directory does not exist.".to_string());
     }
     *state.base_dir.lock().unwrap() = path;
+    
+    let store = app.get_store("settings.json").unwrap_or_else(|| {
+        app.store("settings.json").unwrap()
+    });
+    store.set("base_dir", serde_json::json!(new_path));
+    let _ = store.save();
     Ok(())
 }
 
